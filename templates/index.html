@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twilio Caller - Control Panel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📞 Twilio Caller Control Panel</h1>
+            <p class="subtitle">Automated call system with DTMF dialing</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Configuration Panel -->
+            <div class="panel config-panel">
+                <h2>⚙️ Configuration</h2>
+                <div class="form-group">
+                    <label for="account_sid">Account SID</label>
+                    <input type="text" id="account_sid" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                </div>
+                <div class="form-group">
+                    <label for="auth_token">Auth Token</label>
+                    <input type="password" id="auth_token" placeholder="Your auth token">
+                </div>
+                <div class="form-group">
+                    <label for="twilio_number">Twilio Number</label>
+                    <input type="text" id="twilio_number" placeholder="+15551112222">
+                </div>
+                <button class="btn btn-secondary" onclick="saveConfig()">Save Configuration</button>
+            </div>
+
+            <!-- Call Control Panel -->
+            <div class="panel control-panel">
+                <h2>🎯 Call Control</h2>
+                <div class="form-group">
+                    <label for="phone_numbers">Phone Numbers (one per line)</label>
+                    <textarea id="phone_numbers" rows="8" placeholder="+1234567890&#10;+1987654321&#10;+1555666777"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="keystrokes">DTMF Keystrokes</label>
+                    <input type="text" id="keystrokes" placeholder="1234" value="1">
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-primary" id="startBtn" onclick="startCalls()">▶️ Start Calls</button>
+                    <button class="btn btn-danger" id="stopBtn" onclick="stopCalls()" disabled>⏹️ Stop Calls</button>
+                </div>
+            </div>
+
+            <!-- Status Panel -->
+            <div class="panel status-panel">
+                <h2>📊 Status</h2>
+                <div class="status-info">
+                    <div class="status-item">
+                        <span class="status-label">Status:</span>
+                        <span class="status-value" id="statusText">Ready</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Progress:</span>
+                        <span class="status-value" id="progressText">0 / 0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Current Number:</span>
+                        <span class="status-value" id="currentNumber">-</span>
+                    </div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressBar"></div>
+                </div>
+            </div>
+
+            <!-- Call Results Panel -->
+            <div class="panel results-panel">
+                <h2>📋 Call Results</h2>
+                <div class="results-header">
+                    <button class="btn btn-small" onclick="refreshResults()">🔄 Refresh</button>
+                    <button class="btn btn-small" onclick="clearResults()">🗑️ Clear</button>
+                </div>
+                <div class="results-list" id="resultsList">
+                    <div class="empty-state">No calls yet. Start calling to see results here.</div>
+                </div>
+            </div>
+
+            <!-- Logs Panel -->
+            <div class="panel logs-panel">
+                <h2>📝 Logs</h2>
+                <div class="logs-header">
+                    <button class="btn btn-small" onclick="loadLogs()">🔄 Load Logs</button>
+                </div>
+                <div class="logs-content" id="logsContent">
+                    <div class="empty-state">No logs loaded. Click "Load Logs" to view call history.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

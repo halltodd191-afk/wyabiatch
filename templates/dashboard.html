@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TIM's Location Tracker - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #map { height: 500px; width: 100%; border-radius: 8px; }
+        .location-card { transition: all 0.3s ease; }
+        .location-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-4xl font-bold mb-2">📍 TIM's Location Tracker</h1>
+            <p class="text-gray-400">Real-time location data dashboard</p>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                <div class="text-gray-400 text-sm mb-1">Total Entries</div>
+                <div class="text-3xl font-bold" id="stat-total">0</div>
+            </div>
+            <div class="bg-green-900/30 rounded-lg p-6 border border-green-700">
+                <div class="text-green-400 text-sm mb-1">Successful</div>
+                <div class="text-3xl font-bold text-green-400" id="stat-successful">0</div>
+            </div>
+            <div class="bg-red-900/30 rounded-lg p-6 border border-red-700">
+                <div class="text-red-400 text-sm mb-1">Denied/Failed</div>
+                <div class="text-3xl font-bold text-red-400" id="stat-denied">0</div>
+            </div>
+            <div class="bg-blue-900/30 rounded-lg p-6 border border-blue-700">
+                <div class="text-blue-400 text-sm mb-1">Unique IPs</div>
+                <div class="text-3xl font-bold text-blue-400" id="stat-ips">0</div>
+            </div>
+        </div>
+
+        <!-- Map and List View -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Map -->
+            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <h2 class="text-xl font-semibold mb-4">📍 Location Map</h2>
+                <div id="map"></div>
+            </div>
+
+            <!-- Recent Locations List -->
+            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold">📋 Recent Locations</h2>
+                    <button onclick="refreshData()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm">
+                        🔄 Refresh
+                    </button>
+                </div>
+                <div id="locations-list" class="space-y-3 max-h-[500px] overflow-y-auto">
+                    <div class="text-gray-400 text-center py-8">Loading locations...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- All Locations Table -->
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+            <h2 class="text-xl font-semibold mb-4">📊 All Location Data</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="text-left p-3">Time</th>
+                            <th class="text-left p-3">IP Address</th>
+                            <th class="text-left p-3">Latitude</th>
+                            <th class="text-left p-3">Longitude</th>
+                            <th class="text-left p-3">Status</th>
+                            <th class="text-left p-3">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="locations-table">
+                        <tr><td colspan="6" class="text-center p-4 text-gray-400">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let map;
+        let markers = [];
+
+        // Initialize map
+        function initMap() {
+            map = L.map('map').setView([0, 0], 2);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        // Load and display data
+        async function loadData() {
+            try {
+                // Load stats
+                const statsRes = await fetch('/api/stats');
+                const stats = await statsRes.json();
+                document.getElementById('stat-total').textContent = stats.total_entries || 0;
+                document.getElementById('stat-successful').textContent = stats.successful || 0;
+                document.getElementById('stat-denied').textContent = stats.denied || 0;
+                document.getElementById('stat-ips').textContent = stats.unique_ips || 0;
+
+                // Load locations
+                const locRes = await fetch('/api/locations');
+                const data = await locRes.json();
+                const locations = data.locations || [];
+
+                // Clear existing markers
+                markers.forEach(m => map.removeLayer(m));
+                markers = [];
+
+                // Update locations list
+                updateLocationsList(locations);
+                
+                // Update table
+                updateLocationsTable(locations);
+
+                // Add markers to map
+                locations.forEach(loc => {
+                    const lat = parseFloat(loc.latitude);
+                    const lon = parseFloat(loc.longitude);
+                    
+                    if (!isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0) {
+                        const marker = L.marker([lat, lon]).addTo(map);
+                        const status = loc.status || 'Unknown';
+                        const ip = loc.source_ip || 'N/A';
+                        const time = loc.time_recorded || 'N/A';
+                        
+                        marker.bindPopup(`
+                            <strong>Location Data</strong><br>
+                            IP: ${ip}<br>
+                            Status: ${status}<br>
+                            Time: ${time}<br>
+                            Coords: ${lat.toFixed(6)}, ${lon.toFixed(6)}
+                        `);
+                        markers.push(marker);
+                    }
+                });
+
+                // Fit map to show all markers
+                if (markers.length > 0) {
+                    const group = new L.featureGroup(markers);
+                    map.fitBounds(group.getBounds().pad(0.1));
+                }
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('locations-list').innerHTML = 
+                    '<div class="text-red-400 text-center py-4">Error loading data</div>';
+            }
+        }
+
+        function updateLocationsList(locations) {
+            const container = document.getElementById('locations-list');
+            
+            if (locations.length === 0) {
+                container.innerHTML = '<div class="text-gray-400 text-center py-8">No locations recorded yet</div>';
+                return;
+            }
+
+            container.innerHTML = locations.slice(0, 10).map(loc => {
+                const lat = parseFloat(loc.latitude);
+                const lon = parseFloat(loc.longitude);
+                const hasCoords = !isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0;
+                const statusColor = loc.status?.toLowerCase().includes('success') ? 'green' : 
+                                  loc.status?.toLowerCase().includes('denied') ? 'red' : 'yellow';
+                
+                return `
+                    <div class="location-card bg-gray-700 rounded p-4 border border-gray-600">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <div class="font-semibold">${loc.source_ip || 'N/A'}</div>
+                                <div class="text-xs text-gray-400">${loc.time_recorded || 'N/A'}</div>
+                            </div>
+                            <span class="px-2 py-1 rounded text-xs bg-${statusColor}-900 text-${statusColor}-400">
+                                ${loc.status || 'Unknown'}
+                            </span>
+                        </div>
+                        ${hasCoords ? `
+                            <div class="text-sm text-gray-300 mt-2">
+                                📍 ${lat.toFixed(6)}, ${lon.toFixed(6)}
+                            </div>
+                        ` : '<div class="text-sm text-gray-500 mt-2">No coordinates</div>'}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateLocationsTable(locations) {
+            const tbody = document.getElementById('locations-table');
+            
+            if (locations.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-gray-400">No data</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = locations.map(loc => {
+                const lat = parseFloat(loc.latitude);
+                const lon = parseFloat(loc.longitude);
+                const hasCoords = !isNaN(lat) && !isNaN(lon);
+                const statusColor = loc.status?.toLowerCase().includes('success') ? 'text-green-400' : 
+                                  loc.status?.toLowerCase().includes('denied') ? 'text-red-400' : 'text-yellow-400';
+                
+                return `
+                    <tr class="border-b border-gray-700 hover:bg-gray-700">
+                        <td class="p-3">${loc.time_recorded ? new Date(loc.time_recorded).toLocaleString() : 'N/A'}</td>
+                        <td class="p-3">${loc.source_ip || 'N/A'}</td>
+                        <td class="p-3">${hasCoords ? lat.toFixed(6) : 'N/A'}</td>
+                        <td class="p-3">${hasCoords ? lon.toFixed(6) : 'N/A'}</td>
+                        <td class="p-3 ${statusColor}">${loc.status || 'N/A'}</td>
+                        <td class="p-3">
+                            ${hasCoords ? `
+                                <a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" 
+                                   class="text-blue-400 hover:text-blue-300">View Map</a>
+                            ` : '-'}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function refreshData() {
+            loadData();
+        }
+
+        // Initialize
+        initMap();
+        loadData();
+        
+        // Auto-refresh every 5 seconds
+        setInterval(loadData, 5000);
+    </script>
+</body>
+</html>
+
